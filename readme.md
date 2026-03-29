@@ -14,6 +14,21 @@
 - **🚀 极简一键安装**：后台自动生成被控端 Bash 一键安装命令。支持 IPv4/IPv6 双栈检测、底层 CPU 时钟精准计算、自动注册 systemd 守护进程守护。
 
 ---
+## 📸 界面预览
+
+*(💡 提示：在这里替换为你自己的截图链接)*
+
+### 1. 前台多节点大盘与全局统计
+<img width="3994" height="1830" alt="image" src="https://github.com/user-attachments/assets/e993f66e-7d3f-4481-ab02-e37edb63a7a1" />
+
+
+### 2. 单节点实时性能折线图
+<img width="3989" height="1830" alt="image" src="https://github.com/user-attachments/assets/7eebc87c-a5aa-4620-a182-f4200fdaebca" />
+
+
+### 3. 后台管理与全局设置
+<img width="3984" height="1830" alt="image" src="https://github.com/user-attachments/assets/cd14d981-6ace-4d0c-97e8-534a177306ea" />
+
 
 ---
 

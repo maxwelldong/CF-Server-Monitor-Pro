@@ -15,21 +15,6 @@
 
 ---
 
-## 📸 界面预览
-
-*(💡 提示：在这里替换为你自己的截图链接)*
-
-### 1. 前台多节点大盘与全局统计
-![Dashboard Preview](https://via.placeholder.com/800x400?text=Dashboard+Screenshot)
-
-### 2. 单节点实时性能折线图
-![Details Preview](https://via.placeholder.com/800x400?text=Details+Chart+Screenshot)
-
-### 3. 后台管理与全局设置
-![Admin Preview](https://via.placeholder.com/800x400?text=Admin+Panel+Screenshot)
-
----
-
 ## 🛠️ 部署指南
 
 ### 第一步：创建 Cloudflare D1 数据库

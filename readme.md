@@ -72,8 +72,6 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 ```
 
----
-
 ### 第二步：创建并配置 Cloudflare Worker
 1. 在 **Workers & Pages** 中创建一个新的 Worker。
 2. 进入该 Worker 的 **Settings (设置)** -> **Variables (变量与机密)**：

@@ -117,49 +117,6 @@ curl -sL [https://你的域名.workers.dev/install.sh](https://你的域名.work
 
     Script 注入：编写原生 JavaScript 接管页面逻辑，比如增加动态粒子背景、甚至通过设置 body { display: none; } 隐藏原生页面，利用 AJAX 请求 /api/server?id=xxx 用你自己的前端框架重绘大盘。
 
-### 👑 【高级玩法揭秘】如何利用注入层彻底重构你的探针？
-
-既然你是能手搓量化框架和写各种环境脚手架的硬核选手，这些开放的注入区域就像给你提供了一个“跳板”。以下是三种高阶用法：
-
-#### 玩法 1：极简换肤（引入大厂 CSS 变量库）
-
-你可以在自定义 `<head>` 里注入 Bootstrap 或者你喜欢的 Google Fonts：
-
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code&display=swap" rel="stylesheet">
-<style>
-  /* 覆盖默认的字体库 */
-  body { font-family: 'Fira Code', monospace !important; }
-</style>
-```
-
-#### 玩法 2：DOM 节点改造（通过 JS 拦截与重写）
-
-不满意当前的 HTML 排版？直接在 **自定义底部 Script** 里面用原生 JS 或动态引入 jQuery，将页面按你的喜好重新拼装：
-
-```html
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-  $(document).ready(function() {
-    // 比如：在所有的卡片右上角加一个炫酷的动态时钟
-    $('.card-title').append('<span class="my-clock" style="margin-left:auto; color:red;"></span>');
-    setInterval(() => { $('.my-clock').text(new Date().toLocaleTimeString()); }, 1000);
-  });
-</script>
-```
-
-#### 玩法 3：最高权限：纯无头模式 (Headless Framework)
-
-这是最强大的用法。在后台的主题里写入一句 CSS 将官方容器干掉：
-
-```css
-body.theme6 #app-container { display: none !important; }
-```
-
-然后，在 **自定义底部 Script** 里，引入 React/Vue 的 CDN，直接使用 `fetch('/api/server?id=xxx')`（或者你甚至可以通过 `SELECT * FROM servers` 的类似接口查出你的全量数据结构），在空白的 `<body>` 里用自己的组件库（例如 Ant Design、Element Plus）从零渲染一个 100% 独一无二的大盘监控。这样你的 Worker 就纯粹变成了一个后端的数据 API 中转站，而前端你可以随心所欲去开发。
-
-
 
 ### ✨ 自定义二次元透明主题 CSS 演示
 
@@ -169,40 +126,50 @@ body.theme6 #app-container { display: none !important; }
 body.theme6 {
   background: url('https://i.33xp.cn/__imgapi.cn__/__imgapi.cn__5d19cf2105e31.jpg') no-repeat center center fixed !important;
   background-size: cover !important;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
 }
 
-/* 2. 卡片半透明效果 (新增了详情页的支持) */
+/* 2. 背景暗色蒙版，提高可读性 */
+body.theme6::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.2); 
+    z-index: -1;
+}
+
+/* 3. 卡片毛玻璃半透明效果 (包含详情页) */
 .theme6 .vps-card, 
 .theme6 .global-stats, 
 .theme6 .custom-table, 
 .theme6 .header,
 .theme6 .view-controls,
-.theme6 .header-card,  /* 详情页：顶部信息卡片 */
-.theme6 .chart-card    /* 详情页：各个图表卡片 */
-{
-  background-color: rgba(250, 250, 250, 0.65) !important; 
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  border-radius: 0.6rem !important;
-  border: 1px solid rgba(255, 255, 255, 0.4) !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
-  transition: all 0.3s ease; /* 增加平滑过渡 */
+.theme6 .header-card,
+.theme6 .chart-card {
+  background-color: rgba(255, 255, 255, 0.65) !important; 
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.3s ease;
 }
 
-/* 3. 悬停卡片时的浮动反馈 */
+/* 4. 悬停反馈 (更具科技感的发光边框) */
 .theme6 .vps-card:hover,
 .theme6 .chart-card:hover {
   background-color: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 0 20px rgba(33, 186, 69, 0.2) !important;
+  border-color: rgba(33, 186, 69, 0.4) !important;
 }
 
-/* 4. 进度条颜色统一改为经典的 Nezha 绿色 (#21ba45) */
+/* 5. 进度条统一改为 Nezha 绿色 */
 .theme6 .stat-bar > div,
-.theme6 #disk-bar { /* 详情页：磁盘进度条 */
+.theme6 #disk-bar {
   background-color: #21ba45 !important;
 }
 
-/* 5. 调整文字和图标颜色适配浅色半透明背景 */
+/* 6. 文字颜色与字体适配 */
 .theme6 .stat-label, 
 .theme6 .g-label, 
 .theme6 .card-meta, 
@@ -214,14 +181,29 @@ body.theme6 {
 .theme6 .g-val, 
 .theme6 .card-title-text, 
 .theme6 .info-value, 
-.theme6 .chart-card h3 { 
-  color: #111 !important; 
-  font-weight: bold !important;
+.theme6 .chart-card h3,
+.theme6 .speed-val { 
+  color: #000 !important; 
+  font-family: 'Consolas', 'Monaco', monospace !important;
 }
 
 .theme6 .group-header { 
   color: #fff !important; 
   text-shadow: 0 2px 4px rgba(0,0,0,0.8); 
+}
+
+/* 7. 优化滚动条样式 */
+.theme6 ::-webkit-scrollbar { width: 6px; height: 6px; }
+.theme6 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
+.theme6 ::-webkit-scrollbar-thumb:hover { background: rgba(33, 186, 69, 0.5); }
+
+/* 8. 图表入场动画 */
+.theme6 .chart-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 ```
 

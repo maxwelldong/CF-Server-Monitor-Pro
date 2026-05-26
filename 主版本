@@ -1221,6 +1221,11 @@ echo "✅ Linux 探针安装成功！"
               metaHtml += `<div class="card-meta" style="${sys.show_price !== 'true' ? 'margin-top:8px;' : ''}">剩余天数: ${expireText}</div>`;
             }
 
+            // 新增：单机 上传/下载 流量统计
+            const rx_val_str = formatBytes(sys.auto_reset_traffic === 'true' ? parseFloat(server.monthly_rx || 0) : parseFloat(server.net_rx || 0));
+            const tx_val_str = formatBytes(sys.auto_reset_traffic === 'true' ? parseFloat(server.monthly_tx || 0) : parseFloat(server.net_tx || 0));
+            metaHtml += `<div class="card-meta" style="${sys.show_price !== 'true' && sys.show_expire !== 'true' ? 'margin-top:8px;' : ''}">流量: <span style="color:#10b981">↓</span> ${rx_val_str} | <span style="color:#3b82f6">↑</span> ${tx_val_str}</div>`;
+
             let badgesHtml = '';
             if (sys.show_bw === 'true' && server.bandwidth) badgesHtml += `<span class="badge badge-bw">${server.bandwidth}</span>`;
             if (sys.show_tf === 'true' && server.traffic_limit) badgesHtml += `<span class="badge badge-tf">${server.traffic_limit}</span>`;
@@ -1275,6 +1280,7 @@ echo "✅ Linux 探针安装成功！"
                     <span>${disk}%</span>
                   </div>
                 </td>
+                <td style="color:#64748b; font-size:12px;">${rx_val_str} | ${tx_val_str}</td>
                 <td>${netInSpeed}/s</td>
                 <td>${netOutSpeed}/s</td>
                 <td style="color:#64748b; font-size:12px;">${Math.round((now - server.last_updated)/1000)} 秒前</td>
@@ -1370,10 +1376,10 @@ echo "✅ Linux 探针安装成功！"
             <div class="table-responsive">
               <table class="custom-table">
                 <thead>
-                  <tr><th>状态</th><th>节点名称</th><th>地区</th><th>架构/系统</th><th>CPU</th><th>内存</th><th>磁盘</th><th>下行</th><th>上行</th><th>更新</th></tr>
+                  <tr><th>状态</th><th>节点名称</th><th>地区</th><th>架构/系统</th><th>CPU</th><th>内存</th><th>磁盘</th><th>流量(入|出)</th><th>下行</th><th>上行</th><th>更新</th></tr>
                 </thead>
                 <tbody id="ajax-table">
-                  ${tableBodyHtml || '<tr><td colspan="10" style="text-align:center;">暂无数据</td></tr>'}
+                  ${tableBodyHtml || '<tr><td colspan="11" style="text-align:center;">暂无数据</td></tr>'}
                 </tbody>
               </table>
             </div>

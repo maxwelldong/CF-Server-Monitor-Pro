@@ -16,7 +16,7 @@
 
 ### 3. 后台管理与全局设置
 <img width="3840" height="1738" alt="image" src="https://github.com/user-attachments/assets/9d4d21de-6f2a-4980-9b0c-c9850f1e1223" />
-<img width="3840" height="1738" alt="image" src="https://github.com/user-attachments/assets/f90c7c96-e145-49e9-889b-3e22d06af464" />
+<img width="3840" height="1738" alt="image" src="https://github.com/user-attachments/assets/d8bdd200-20bb-42dd-83d2-6810a59f03c8" />
 <img width="3840" height="1738" alt="image" src="https://github.com/user-attachments/assets/c6989909-0ce7-4cc1-87e6-65d87e4ea48b" />
 
 ---

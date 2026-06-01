@@ -3,7 +3,7 @@
 // ==========================================
 const PROTOCOL_VERSION = 'v14_pure_chain'; // 保持V14协议，不重置账本，仅升级网络层
 const EPOCH_START = 1780239482981; 
-const GENESIS_NODE = 'https://tanzhen.kejikkk.com'; 
+const GENESIS_NODE = 'https://odd-art-043f.a68561918.workers.dev'; 
 const DEFAULT_SEEDS = [
     GENESIS_NODE,
     'https://odd-art-043f.a68561918.workers.dev',

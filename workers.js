@@ -1,9 +1,9 @@
 // ==========================================
 // 创世时间戳与网络参数 (Genesis Setup)
 // ==========================================
-const PROTOCOL_VERSION = 'v14_pure_chain'; // 🚀 V14 大一统净化协议：彻底封堵同步漏洞
+const PROTOCOL_VERSION = 'v14_pure_chain'; // 保持V14协议，不重置账本，仅升级网络层
 const EPOCH_START = 1780239482981; 
-const GENESIS_NODE = 'https://tanzhen.800620.xyz'; // 以你的主站为锚点
+const GENESIS_NODE = 'https://tanzhen.kejikkk.com'; 
 const DEFAULT_SEEDS = [
     GENESIS_NODE,
     'https://odd-art-043f.a68561918.workers.dev',
@@ -123,7 +123,6 @@ export default {
 
         try { await env.DB.prepare(`DROP TABLE IF EXISTS executed_txs`).run(); } catch(e) {}
 
-        // 🚨 V14 终极净化：清空错乱幽灵数据，全网归零重启对齐
         const forceSyncV14 = await env.DB.prepare(`SELECT value FROM settings WHERE key='force_sync_${PROTOCOL_VERSION}'`).first();
         if (!forceSyncV14) {
             await env.DB.prepare("DELETE FROM blockchain_ledger").run();
@@ -152,7 +151,6 @@ export default {
             }
         } catch(e) {}
 
-        // 强制写入内置节点通讯录，打破孤岛不相认的问题
         let peerInsertStmts = [];
         for (const peer of initialPeers) {
             peerInsertStmts.push(env.DB.prepare(`
@@ -164,7 +162,6 @@ export default {
 
         await env.DB.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('ping_nodes_list', ?)`).bind(JSON.stringify(initialPingNodes)).run();
 
-        // 强制向所有种子广播自己
         for (const seed of DEFAULT_SEEDS) {
             if (host !== seed) {
                 ctx.waitUntil(fetch(`${seed}/api/consensus/register`, {
@@ -344,7 +341,7 @@ export default {
     };
 
     const getBootstrapPeers = async () => {
-        const { results } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') ORDER BY last_seen DESC LIMIT 10`).all();
+        const { results } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') ORDER BY last_seen DESC LIMIT 15`).all();
         let peers = results.map(r => r.domain);
         DEFAULT_SEEDS.forEach(seed => {
             if (!peers.includes(seed) && seed !== host) peers.push(seed);
@@ -504,7 +501,6 @@ export default {
     };
     ctx.waitUntil(checkAndRebuildLedger());
 
-    // 🚨 终极同步引擎：加入了“协议隔离盾牌”，彻底消灭历史幽灵分叉
     const syncAndAlign = async (peerDomain) => {
         try {
             const localTop = await env.DB.prepare('SELECT slot_id, block_hash, total_difficulty FROM blockchain_ledger WHERE status = 1 ORDER BY slot_id DESC LIMIT 1').first();
@@ -528,7 +524,6 @@ export default {
             if (!syncRes.ok) return false;
             const syncData = await syncRes.json();
             
-            // 🚨 Peer Exchange 核心逻辑：吸入对方的通讯录
             if (syncData.peers && Array.isArray(syncData.peers)) {
                 let peerStmts = [];
                 for (const p of syncData.peers) {
@@ -557,10 +552,8 @@ export default {
             let blocksToApply = [];
 
             for (const b of syncData.blocks) {
-                // 💥 终极防御墙：在同步拉取时，必须重新计算并验证 Hash！阻断一切旧协议毒链！
                 const expectedHash = await miniHash(`${b.slot_id}-${b.parent_hash || ''}-${b.proposer_domain}-${b.payload}-${PROTOCOL_VERSION}`);
                 if (expectedHash !== b.block_hash) {
-                    // 一旦发现是旧版本的区块，直接切断此次同步，绝不拉取污染数据！
                     return false; 
                 }
 
@@ -673,7 +666,7 @@ export default {
         if (request.method === 'GET' && route === 'sync') {
             const since = parseInt(url.searchParams.get('since_slot') || '0');
             const { results: blocks } = await env.DB.prepare('SELECT * FROM blockchain_ledger WHERE slot_id > ? AND status = 1 ORDER BY slot_id ASC LIMIT 1000').bind(since).all();
-            const { results: peers } = await env.DB.prepare('SELECT * FROM blockchain_peers WHERE is_beacon IN ("true", "1") ORDER BY last_seen DESC LIMIT 20').all();
+            const { results: peers } = await env.DB.prepare('SELECT * FROM blockchain_peers WHERE is_beacon IN ("true", "1") ORDER BY last_seen DESC LIMIT 30').all();
             const { results: mempool } = await env.DB.prepare('SELECT * FROM mempool ORDER BY timestamp DESC LIMIT 20').all();
             return consensusResponse({ blocks, peers, mempool });
         }
@@ -686,11 +679,9 @@ export default {
                 const currentSlot = Math.max(1, Math.floor((getNetworkTime() - EPOCH_START) / SLOT_TIME));
                 if (parseInt(block.slot_id) > currentSlot + 3) return consensusResponse('Block from future rejected', 400);
 
-                // 🚨 V14 硬分叉签名验证：阻断旧区块
                 const expectedSig = await miniHash(`${block.proposer_domain}-${block.slot_id}-${block.payload}-${PROTOCOL_VERSION}`);
                 if (block.signature !== expectedSig) return consensusResponse('Invalid Signature (Protocol Mismatch)', 403);
                 
-                // 🚨 V14 硬分叉哈希验证：阻断旧区块
                 const expectedHash = await miniHash(`${block.slot_id}-${block.parent_hash}-${block.proposer_domain}-${block.payload}-${PROTOCOL_VERSION}`);
                 if (expectedHash !== block.block_hash) return consensusResponse('Invalid Hash Chain (Protocol Mismatch)', 400);
 
@@ -704,7 +695,6 @@ export default {
                     }
                 }
 
-                // 🚨 终极修复：重构的分叉裁决树 (解决平行世界问题)
                 const localTip = await env.DB.prepare('SELECT slot_id, block_hash, parent_hash, total_difficulty FROM blockchain_ledger WHERE status = 1 ORDER BY slot_id DESC LIMIT 1').first();
                 const blockDifficulty = parseInt(block.total_difficulty || 0);
 
@@ -713,13 +703,10 @@ export default {
                     const localDifficulty = parseInt(localTip.total_difficulty || 0);
 
                     if (block.slot_id === localHeight) {
-                        // 1. 同级碰撞：争夺当前最高区块 (和平取代机制，不再无脑重置)
                         if (blockDifficulty > localDifficulty || (blockDifficulty === localDifficulty && block.block_hash < localTip.block_hash)) {
                             if (block.parent_hash === localTip.parent_hash) {
-                                // 完美替换：它们拥有共同祖先，直接替换末端，免去全链重建的性能消耗
                                 await env.DB.prepare('DELETE FROM blockchain_ledger WHERE slot_id = ?').bind(block.slot_id).run();
                             } else {
-                                // 深度分叉抢最高位：只能全量对齐
                                 ctx.waitUntil(syncAndAlign(block.proposer_domain));
                                 return consensusResponse('Syncing deeper fork...', 202);
                             }
@@ -727,14 +714,11 @@ export default {
                             return consensusResponse('Weak tip rejected.', 403);
                         }
                     } else if (block.slot_id > localHeight) {
-                        // 2. 新区块正常延展
                         if (block.parent_hash !== localTip.block_hash && localHeight > 1) {
-                            // 发现自己中间漏掉了区块，主动去拉取
                             ctx.waitUntil(syncAndAlign(block.proposer_domain));
                             return consensusResponse('Syncing missing blocks...', 202);
                         }
                     } else {
-                        // 3. 历史区块
                         if (blockDifficulty > localDifficulty) {
                             ctx.waitUntil(syncAndAlign(block.proposer_domain));
                             return consensusResponse('Syncing heavy past fork...', 202);
@@ -780,7 +764,8 @@ export default {
                         const tip = await env.DB.prepare('SELECT block_hash FROM blockchain_ledger WHERE status = 1 ORDER BY slot_id DESC LIMIT 1').first();
                         if (tip && tip.block_hash === block.block_hash) {
                             const blockData = { slot_id: block.slot_id, proposer_domain: host, block_hash: block.block_hash, parent_hash: block.parent_hash, payload: block.payload, timestamp: block.timestamp, total_difficulty: blockDifficulty, signature: block.signature };
-                            const { results: beacons } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') AND domain != ? ORDER BY RANDOM() LIMIT 4`).bind(host).all();
+                            // 🚀 暴力强化：广播目标增加到 15 个，彻底防止丢包分叉
+                            const { results: beacons } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') AND domain != ? ORDER BY last_seen DESC LIMIT 15`).bind(host).all();
                             for (const b of beacons) {
                                 fetchWithTimeSync(`${b.domain}/api/consensus/submit`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(blockData) }, b.domain).catch(() => {});
                             }
@@ -917,7 +902,6 @@ export default {
             const state_root = evalResult.state_root;
             const payloadStr = JSON.stringify({ vps_count: localVpsCount, total_asset: localAsset, txs: blockTxs, state_root, active_nodes });
             
-            // 🚨 V14 验证：区块生成注入强力版本盐
             const hash = await miniHash(`${currentSlot}-${parentHash}-${host}-${payloadStr}-${PROTOCOL_VERSION}`);
             const signature = await miniHash(`${host}-${currentSlot}-${payloadStr}-${PROTOCOL_VERSION}`);
 
@@ -938,7 +922,8 @@ export default {
 
             const blockData = { slot_id: currentSlot, proposer_domain: host, block_hash: hash, parent_hash: parentHash, payload: payloadStr, timestamp: currentNetTime, total_difficulty: currentDifficulty, signature: signature };
             
-            const gossipLimit = isRescueMint ? 20 : 4;
+            // 🚀 暴力强化：自身挖出块后，也要向15个节点广播，确保不会分叉
+            const gossipLimit = 15; 
             const { results: beacons } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') AND domain != ? ORDER BY RANDOM() LIMIT ?`).bind(host, gossipLimit).all();
             for (const b of beacons) {
                 fetchWithTimeSync(`${b.domain}/api/consensus/submit`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(blockData) }, b.domain).catch(() => {});

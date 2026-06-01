@@ -521,13 +521,10 @@ export default {
 
             const forkStartSlot = syncData.blocks[0].slot_id;
 
-            // ⚠️ FIX: 移除 if (localHeight - forkStartSlot >= FINALITY_DEPTH) return;
-            // 彻底解决深度分叉和节点丢失区块后永远不弥补的 BUG
-
             let forkResolved = false;
             let batchStmts = [];
             
-            // ⚠️ FIX: 从软状态 UPDATE 调整为强制 DELETE 重置冲突区块，确保从对等节点同步的分支完全覆盖本地
+            // ⚠️ 从软状态 UPDATE 调整为强制 DELETE 重置冲突区块，确保从对等节点同步的分支完全覆盖本地
             batchStmts.push(env.DB.prepare(`DELETE FROM blockchain_ledger WHERE slot_id >= ?`).bind(forkStartSlot));
 
             for (const b of syncData.blocks) {
@@ -651,7 +648,6 @@ export default {
 
                 if (block.parent_hash !== localPrevHash && block.slot_id > 1) {
                     if (blockDifficulty > localDifficulty || (blockDifficulty === localDifficulty && block.block_hash < localPrevHash)) {
-                        // ⚠️ FIX: 触发分叉纠错时扩大回溯窗口至 30 保证容错
                         ctx.waitUntil(resolveFork(block.proposer_domain, Math.max(0, localHeight - 30)));
                         return consensusResponse('Syncing fork...', 202);
                     }
@@ -691,7 +687,7 @@ export default {
                     const { results: wallets } = await env.DB.prepare('SELECT address, balance FROM blockchain_wallets WHERE balance > 0').all();
                     const snapMap = {};
                     wallets.forEach(w => snapMap[w.address] = w.balance);
-                    await env.DB.prepare('INSERT OR REPLACE INTO checkpoints (slot_id, state_root, state_snapshot, block_hash, signature) VALUES (?, ?, ?, ?, ?)').bind(block.slot_id, pl.state_root, JSON.stringify(snapMap), block.block_hash, block.signature).run();
+                    await env.DB.prepare('INSERT OR REPLACE INTO checkpoints (slot_id, state_root, state_snapshot, block_hash, signature) VALUES (?, ?, ?, ?, ?)').bind(block.slot_id, pl.state_root, JSON.stringify(snapMap), hash, signature).run();
                 }
 
                 if (!globalThis.gossipCache) globalThis.gossipCache = new Set();
@@ -764,14 +760,13 @@ export default {
                         }
                     }
 
-                    // ⚠️ FIX: Routine sync回溯范围从 -10 增加到 -30 以覆盖更长期的弱网掉块
                     const syncRes = await fetchWithTimeSync(`${peerDomain}/api/consensus/sync?since_slot=${Math.max(0, since - 30)}`, {}, peerDomain);
                     if (!syncRes.ok) return false;
                     const syncData = await syncRes.json();
                     if (!syncData.blocks || syncData.blocks.length === 0) return false;
 
                     let allStmts = [];
-                    let triggerRebuild = false; // ⚠️ FIX: 新增标志位，补洞后热重载
+                    let triggerRebuild = false; 
 
                     for (const b of syncData.blocks) {
                         if (b.slot_id <= currentSlot + 3) {
@@ -820,16 +815,13 @@ export default {
             let isMyTurn = false;
             let isRescueMint = false; 
             
+            // 🚨 完美阶梯错峰发车机制 (0s, 4s, 8s) - 拉大时间差
             if (sys.is_beacon === 'true') {
                 if (leaders[0] === host) {
                     isMyTurn = true; 
-                } else if (leaders.length > 1 && leaders[1] === host && elapsedInSlot >= 2000) {
+                } else if (leaders.length > 1 && leaders[1] === host && elapsedInSlot >= 4000) {
                     isMyTurn = true; 
-                } else if (leaders.length > 2 && leaders[2] === host && elapsedInSlot >= 4000) {
-                    isMyTurn = true; 
-                } else if (leaders.length > 3 && leaders[3] === host && elapsedInSlot >= 6000) {
-                    isMyTurn = true; 
-                } else if (leaders.length > 4 && leaders[4] === host && elapsedInSlot >= 8000) {
+                } else if (leaders.length > 2 && leaders[2] === host && elapsedInSlot >= 8000) {
                     isMyTurn = true; 
                 } else if (elapsedInSlot >= 9000 && timeSinceLastBlock > 25000) {
                     isMyTurn = true; 
@@ -852,6 +844,10 @@ export default {
                 return;
             }
 
+            // 🚨 发车前增加随机抖动 (Jitter) 打散并发碰撞
+            await new Promise(r => setTimeout(r, Math.random() * 300));
+
+            // 发车前最后查一次岗，避免自己撞自己
             const existCheck = await env.DB.prepare('SELECT slot_id FROM blockchain_ledger WHERE slot_id = ?').bind(currentSlot).first();
             if (existCheck) return;
 
@@ -902,6 +898,7 @@ export default {
 
             const blockData = { slot_id: currentSlot, proposer_domain: host, block_hash: hash, parent_hash: parentHash, payload: payloadStr, timestamp: currentNetTime, total_difficulty: currentDifficulty, signature: signature };
             
+            // 🚨 Gossip 限制保持在合理范围内，避免网络风暴
             const gossipLimit = isRescueMint ? 20 : 4;
             const { results: beacons } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') AND domain != ? ORDER BY RANDOM() LIMIT ?`).bind(host, gossipLimit).all();
             for (const b of beacons) {

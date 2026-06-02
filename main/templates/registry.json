@@ -1,0 +1,9 @@
+{
+  "version": "v16.1",
+  "modules": {
+    "theme_css": "https://raw.githubusercontent.com/a63414262/CF-Server-Monitor-Pro/main/templates/theme.css",
+    "install_sh": "https://raw.githubusercontent.com/a63414262/CF-Server-Monitor-Pro/main/templates/install.sh",
+    "admin_html": "https://raw.githubusercontent.com/a63414262/CF-Server-Monitor-Pro/main/templates/admin.html",
+    "index_html": "https://raw.githubusercontent.com/a63414262/CF-Server-Monitor-Pro/main/templates/index.html"
+  }
+}

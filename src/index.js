@@ -319,6 +319,58 @@ export default {
     `;
 
     // ==========================================
+    // 内部排行 API (/api/rank) 供前端异步调用
+    // ==========================================
+    if (request.method === 'GET' && url.pathname === '/api/rank') {
+      try {
+        const nowMs = Date.now();
+        await env.DB.prepare("DELETE FROM peers WHERE last_seen < ? AND last_seen > 0").bind(nowMs - 86400000).run();
+
+        const { results: rankData } = await env.DB.prepare('SELECT domain, server_count as servers, total_asset as assets, last_seen FROM peers ORDER BY total_asset DESC, server_count DESC LIMIT 100').all();
+        
+        let asset_rank = 0;
+        let server_rank = 0;
+        let global_servers = 0;
+        let global_assets = 0;
+        
+        rankData.forEach(r => {
+            global_servers += parseInt(r.servers) || 0;
+            global_assets += parseFloat(r.assets) || 0;
+        });
+
+        const sortedByAsset = [...rankData].sort((a,b) => b.assets - a.assets);
+        const sortedByServer = [...rankData].sort((a,b) => b.servers - a.servers);
+        
+        asset_rank = sortedByAsset.findIndex(r => r.domain === myDomain) + 1;
+        server_rank = sortedByServer.findIndex(r => r.domain === myDomain) + 1;
+        
+        return new Response(JSON.stringify({ 
+            list: rankData, 
+            server_rank: server_rank > 0 ? server_rank : '-', 
+            asset_rank: asset_rank > 0 ? asset_rank : '-',
+            global_servers: global_servers,
+            global_assets: global_assets,
+            timestamp: nowMs
+        }), { headers: { 'Content-Type': 'application/json' } });
+      } catch(e) {
+        return new Response(JSON.stringify({error: true}), { status: 500 });
+      }
+    }
+
+    // ==========================================
+    // 单个服务器详情 JSON API
+    // ==========================================
+    if (request.method === 'GET' && url.pathname === '/api/server') {
+      if (sys.is_public !== 'true' && !checkAuth(request)) return authResponse(sys.site_title);
+      
+      const id = url.searchParams.get('id');
+      if (!id) return new Response('Miss ID', { status: 400 });
+      const server = await env.DB.prepare('SELECT * FROM servers WHERE id = ?').bind(id).first();
+      if (!server || server.is_hidden === 'true') return new Response('Not Found', { status: 404 });
+      return new Response(JSON.stringify(server), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // ==========================================
     // 去中心化 API 接口：接收 Gossip 同步数据 (/api/gossip)
     // ==========================================
     if (request.method === 'POST' && url.pathname === '/api/gossip') {
@@ -347,41 +399,6 @@ export default {
         return new Response('Gossip Synced', {status: 200});
       } catch (e) {
         return new Response('Gossip Error', {status: 500});
-      }
-    }
-
-    // ==========================================
-    // 内部排行 API (/api/rank) 供前端异步调用
-    // ==========================================
-    if (request.method === 'GET' && url.pathname === '/api/rank') {
-      try {
-        const { results: rankData } = await env.DB.prepare('SELECT domain, server_count as servers, total_asset as assets FROM peers ORDER BY total_asset DESC, server_count DESC LIMIT 100').all();
-        
-        let asset_rank = 0;
-        let server_rank = 0;
-        let global_servers = 0;
-        let global_assets = 0;
-        
-        rankData.forEach(r => {
-            global_servers += parseInt(r.servers) || 0;
-            global_assets += parseFloat(r.assets) || 0;
-        });
-
-        const sortedByAsset = [...rankData].sort((a,b) => b.assets - a.assets);
-        const sortedByServer = [...rankData].sort((a,b) => b.servers - a.servers);
-        
-        asset_rank = sortedByAsset.findIndex(r => r.domain === myDomain) + 1;
-        server_rank = sortedByServer.findIndex(r => r.domain === myDomain) + 1;
-        
-        return new Response(JSON.stringify({ 
-            list: rankData, 
-            server_rank: server_rank > 0 ? server_rank : '-', 
-            asset_rank: asset_rank > 0 ? asset_rank : '-',
-            global_servers: global_servers,
-            global_assets: global_assets
-        }), { headers: { 'Content-Type': 'application/json' } });
-      } catch(e) {
-        return new Response(JSON.stringify({error: true}), { status: 500 });
       }
     }
 
@@ -590,20 +607,12 @@ export default {
               </div>
 
               <hr style="margin: 15px 0; border: none; border-top: 1px dashed #ccc;">
-              <div class="checkbox-group">
-                <input type="checkbox" id="cfg_show_asset" checked disabled>
-                <label for="cfg_show_asset">在前台和卡片显示 <b>数字资产价值</b></label>
-              </div>
-              <div class="form-group" style="margin-left: 28px; margin-top: -5px; margin-bottom: 5px;">
+              <div class="form-group" style="margin-left: 0px; margin-top: -5px; margin-bottom: 5px;">
                 <label style="font-size: 12px;">资产货币展示单位 (默认：元)</label>
                 <input type="text" id="cfg_asset_currency" value="${sys.asset_currency || '元'}" style="width: 120px; padding: 6px;">
               </div>
               
-              <div class="checkbox-group" style="margin-top: 10px;">
-                <input type="checkbox" id="cfg_enable_ranking" checked disabled>
-                <label for="cfg_enable_ranking">开启去中心化 <b>全网排行榜 (Gossip Protocol)</b></label>
-              </div>
-              <div class="form-group" id="ranking_api_group" style="display: block; margin-left: 28px; margin-top: -5px; margin-bottom: 15px;">
+              <div class="form-group" id="ranking_api_group" style="display: block; margin-left: 0px; margin-top: 10px; margin-bottom: 15px;">
                 <label style="font-size: 12px; color:#f59e0b;">Gossip 初始种子节点 (多域名以逗号分隔)</label>
                 <input type="text" id="cfg_seed_nodes" value="${sys.seed_nodes}" placeholder="如: tanzhen.kejikkk.com" style="width: 250px; padding: 6px;">
                 <span style="font-size:12px; color:#888;">* 默认为极客分享官方节点。新部署的探针通过它来联络其他探针，裂变出整个去中心化网络。</span>
@@ -698,9 +707,6 @@ export default {
             const theme = document.getElementById('cfg_theme').value;
             document.getElementById('custom_css_group').style.display = theme === 'theme6' ? 'flex' : 'none';
           }
-          function toggleRankingApi() {
-            // Already forced on, no action needed for this UI
-          }
 
           function uploadBg(input) {
             const file = input.files[0];
@@ -734,9 +740,7 @@ export default {
                 show_expire: document.getElementById('cfg_show_expire').checked ? 'true' : 'false',
                 show_bw: document.getElementById('cfg_show_bw').checked ? 'true' : 'false',
                 show_tf: document.getElementById('cfg_show_tf').checked ? 'true' : 'false',
-                show_asset: 'true',
                 asset_currency: document.getElementById('cfg_asset_currency').value || '元',
-                enable_ranking: 'true',
                 seed_nodes: document.getElementById('cfg_seed_nodes').value,
                 tg_notify: document.getElementById('cfg_tg_notify').value,
                 tg_bot_token: document.getElementById('cfg_tg_bot_token').value,
@@ -1232,7 +1236,262 @@ echo "✅ Linux 探针安装成功！热重载功能已启用。"
       if (sys.is_public !== 'true' && !checkAuth(request)) return authResponse(sys.site_title);
 
       const isAjax = url.searchParams.get('ajax') === '1';
-      
+      const idParam = url.searchParams.get('id');
+
+      // ==========================================
+      // 详情页拦截与视图渲染
+      // ==========================================
+      if (idParam && !isAjax) {
+        const server = await env.DB.prepare('SELECT * FROM servers WHERE id = ?').bind(idParam).first();
+        if (!server || server.is_hidden === 'true') return new Response('Server Not Found', { status: 404 });
+        
+        const cCode = (server.country || 'xx').toLowerCase();
+        const flagHtml = cCode !== 'xx' ? `<img src="https://flagcdn.com/24x18/${cCode}.png" alt="${cCode}" style="vertical-align: middle; margin-right: 8px; border-radius: 3px;">` : '🏳️';
+        const isOnline = (Date.now() - server.last_updated) < 30000;
+        const statusHtml = isOnline ? '<span style="background:#10b981; color:white; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:bold;">在线</span>' : '<span style="background:#ef4444; color:white; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:bold;">离线</span>';
+
+        const detailHtml = `<!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${server.name} - ${sys.site_title}</title>
+          ${sys.custom_head || ''}
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f5f7; color: #333; margin: 0; padding: 0; }
+            ${themeStyles}
+            .stat-label { color: #888; margin-bottom: 5px; font-size: 12px; }
+            .stat-val { font-weight: bold; font-size: 14px; color: inherit; }
+            .header-card .stat-label { color: inherit; opacity: 0.7; }
+            .theme2 .stat-label, .theme5 .stat-label, .theme4 .stat-label { color: rgba(255,255,255,0.6); }
+            .theme2 .stat-val, .theme5 .stat-val, .theme4 .stat-val { color: #fff; }
+            .chart-full canvas { max-height: 250px !important; }
+            .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-bottom: 30px; }
+          </style>
+        </head>
+        <body class="${sys.theme || 'theme1'}">
+          <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+            <div style="margin-bottom: 20px;">
+              <a href="/" style="color: #3b82f6; text-decoration: none; font-weight: bold; font-size: 16px; display:inline-flex; align-items:center;">← 返回大盘</a>
+            </div>
+            
+            <div class="header-card" style="padding: 25px; border-radius: 12px; margin-bottom: 20px;">
+              <div style="font-size: 24px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center;">
+                ${flagHtml} ${server.name} ${statusHtml}
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px;">
+                <div><div class="stat-label">运行时间</div><div class="stat-val" id="d-uptime">${server.uptime || '-'}</div></div>
+                <div><div class="stat-label">架构</div><div class="stat-val" id="d-arch">${server.arch || '-'}</div></div>
+                <div><div class="stat-label">系统</div><div class="stat-val" id="d-os">${server.os || '-'}</div></div>
+                <div><div class="stat-label">虚拟化</div><div class="stat-val" id="d-virt">${server.virt || '-'}</div></div>
+                <div><div class="stat-label">Load</div><div class="stat-val" id="d-load">${server.load_avg || '-'}</div></div>
+                <div><div class="stat-label">上传 / 下载</div><div class="stat-val"><span id="d-tx">${formatBytes(server.net_tx)}</span> / <span id="d-rx">${formatBytes(server.net_rx)}</span></div></div>
+                <div><div class="stat-label">启动时间</div><div class="stat-val" id="d-boot">${server.boot_time || '-'}</div></div>
+                <div><div class="stat-label">CPU</div><div class="stat-val" id="d-cpuinfo">${server.cpu_info || '-'}</div></div>
+              </div>
+            </div>
+
+            <div class="detail-grid">
+              <div class="chart-card" style="padding: 20px; border-radius: 12px; position: relative;">
+                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                   <span class="card-title" style="font-weight:bold;">CPU</span><span id="txt-cpu" class="stat-val" style="font-weight:bold;">0%</span>
+                 </div>
+                 <div style="height: 180px;"><canvas id="chart-cpu"></canvas></div>
+              </div>
+              
+              <div class="chart-card" style="padding: 20px; border-radius: 12px; position: relative;">
+                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                   <span class="card-title" style="font-weight:bold;">内存</span><span id="txt-ram" class="stat-val" style="font-weight:bold;">0%</span>
+                 </div>
+                 <div style="font-size: 12px; color: #888; position: absolute; top: 45px; left: 20px;">Swap: <span id="txt-swap">0 / 0</span></div>
+                 <div style="height: 180px;"><canvas id="chart-ram"></canvas></div>
+              </div>
+
+              <div class="chart-card" style="padding: 20px; border-radius: 12px; position: relative;">
+                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                   <span class="card-title" style="font-weight:bold;">磁盘</span><span id="txt-disk" class="stat-val" style="font-weight:bold;">0%</span>
+                 </div>
+                 <div class="stat-bar-full" style="height: 24px; border-radius: 12px; background: rgba(150,150,150,0.1); border: 1px solid rgba(150,150,150,0.2); overflow: hidden;">
+                    <div id="bar-disk" style="height: 100%; border-radius: 12px; background: #3b82f6; width: 0%; transition: width 0.5s;"></div>
+                 </div>
+                 <div style="text-align: right; font-size: 13px; color: #888; margin-top: 15px;" id="txt-disk-detail">0 / 0</div>
+              </div>
+
+              <div class="chart-card" style="padding: 20px; border-radius: 12px; position: relative;">
+                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                   <span class="card-title" style="font-weight:bold;">进程数</span><span id="txt-proc" class="stat-val" style="font-weight:bold;">0</span>
+                 </div>
+                 <div style="height: 180px;"><canvas id="chart-proc"></canvas></div>
+              </div>
+
+              <div class="chart-card" style="padding: 20px; border-radius: 12px; position: relative;">
+                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                   <span class="card-title" style="font-weight:bold;">网络速度</span><span class="stat-val" style="font-weight:bold;"><span style="color:#10b981;">↓</span> <span id="txt-net-in">0 B/s</span> | <span style="color:#3b82f6;">↑</span> <span id="txt-net-out">0 B/s</span></span>
+                 </div>
+                 <div style="height: 180px;"><canvas id="chart-net"></canvas></div>
+              </div>
+
+              <div class="chart-card" style="padding: 20px; border-radius: 12px; position: relative;">
+                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                   <span class="card-title" style="font-weight:bold;">TCP / UDP</span><span class="stat-val" style="font-weight:bold;">TCP <span id="txt-tcp">0</span> | UDP <span id="txt-udp">0</span></span>
+                 </div>
+                 <div style="height: 180px;"><canvas id="chart-conn"></canvas></div>
+              </div>
+
+              <div class="chart-card chart-full" style="padding: 20px; border-radius: 12px; position: relative; grid-column: 1 / -1;">
+                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                   <span class="card-title" style="font-weight:bold;">三网延迟 (ms)</span>
+                 </div>
+                 <div style="height: 250px;"><canvas id="chart-ping"></canvas></div>
+              </div>
+            </div>
+            
+            ${getFooterHtml(sys)}
+          </div>
+
+          <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+          <script>
+            const serverId = "${idParam}";
+            let charts = {};
+
+            const formatBytesJs = (bytes) => {
+               const b = parseInt(bytes);
+               if (isNaN(b) || b === 0) return '0 B';
+               const k = 1024;
+               const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+               const i = Math.floor(Math.log(b) / Math.log(k));
+               return parseFloat((b / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            };
+
+            function initChart(ctxId, label1, label2, color1, color2, isSpeed = false) {
+              const ctx = document.getElementById(ctxId).getContext('2d');
+              const isDark = document.body.className.includes('theme2') || document.body.className.includes('theme5') || document.body.className.includes('theme4') || document.body.className.includes('theme6');
+              const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+              const fontColor = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)';
+              
+              const datasets = [{
+                  label: label1, data: [], borderColor: color1, backgroundColor: color1.replace('1)', '0.1)'),
+                  borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4
+              }];
+              if (label2) {
+                 datasets.push({
+                    label: label2, data: [], borderColor: color2, backgroundColor: 'transparent',
+                    borderWidth: 2, pointRadius: 0, fill: false, tension: 0.4
+                 });
+              }
+
+              return new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: datasets },
+                options: {
+                  responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, interaction: { mode: 'index', intersect: false },
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: function(context) { let l = context.dataset.label || ''; if (l) l += ': '; if (context.parsed.y !== null) l += isSpeed ? formatBytesJs(context.parsed.y) + '/s' : context.parsed.y; return l; } } }
+                  },
+                  scales: {
+                    x: { grid: { display: false, drawBorder: false }, ticks: { color: fontColor, maxTicksLimit: 6 } },
+                    y: { grid: { color: gridColor, drawBorder: false }, ticks: { color: fontColor, callback: function(value) { return isSpeed ? formatBytesJs(value) : value; } }, beginAtZero: true }
+                  }
+                }
+              });
+            }
+
+            function initPingChart() {
+              const ctx = document.getElementById('chart-ping').getContext('2d');
+              const isDark = document.body.className.includes('theme2') || document.body.className.includes('theme5') || document.body.className.includes('theme4') || document.body.className.includes('theme6');
+              const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+              const fontColor = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)';
+
+              return new Chart(ctx, {
+                type: 'line',
+                data: { 
+                   labels: [], 
+                   datasets: [
+                     { label: '电信', data: [], borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+                     { label: '联通', data: [], borderColor: '#f59e0b', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+                     { label: '移动', data: [], borderColor: '#10b981', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+                     { label: '字节', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 }
+                   ] 
+                },
+                options: {
+                  responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, interaction: { mode: 'index', intersect: false },
+                  plugins: { legend: { labels: { color: fontColor } } },
+                  scales: {
+                    x: { grid: { display: false }, ticks: { color: fontColor, maxTicksLimit: 8 } },
+                    y: { grid: { color: gridColor }, ticks: { color: fontColor }, beginAtZero: true }
+                  }
+                }
+              });
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+               charts.cpu = initChart('chart-cpu', 'CPU (%)', null, 'rgba(59, 130, 246, 1)');
+               charts.ram = initChart('chart-ram', '内存 (%)', null, 'rgba(16, 185, 129, 1)');
+               charts.proc = initChart('chart-proc', '进程数', null, 'rgba(139, 92, 246, 1)');
+               charts.net = initChart('chart-net', '下载', '上传', 'rgba(16, 185, 129, 1)', 'rgba(59, 130, 246, 1)', true);
+               charts.conn = initChart('chart-conn', 'TCP', 'UDP', 'rgba(245, 158, 11, 1)', 'rgba(236, 72, 153, 1)');
+               charts.ping = initPingChart();
+               fetchData(); setInterval(fetchData, 4000);
+            });
+
+            async function fetchData() {
+               try {
+                  const res = await fetch('/api/server?id=' + serverId);
+                  if (!res.ok) return;
+                  const data = await res.json();
+                  
+                  document.getElementById('d-uptime').innerText = data.uptime;
+                  document.getElementById('d-os').innerText = data.os;
+                  document.getElementById('d-arch').innerText = data.arch;
+                  document.getElementById('d-virt').innerText = data.virt;
+                  document.getElementById('d-load').innerText = data.load_avg;
+                  document.getElementById('d-boot').innerText = data.boot_time;
+                  document.getElementById('d-tx').innerText = formatBytesJs(data.net_tx);
+                  document.getElementById('d-rx').innerText = formatBytesJs(data.net_rx);
+                  document.getElementById('d-cpuinfo').innerText = data.cpu_info;
+
+                  document.getElementById('txt-cpu').innerText = data.cpu + '%';
+                  document.getElementById('txt-ram').innerText = data.ram + '%';
+                  document.getElementById('txt-swap').innerText = formatBytesJs(data.swap_used * 1048576) + ' / ' + formatBytesJs(data.swap_total * 1048576);
+                  document.getElementById('txt-disk').innerText = data.disk + '%';
+                  document.getElementById('bar-disk').style.width = data.disk + '%';
+                  document.getElementById('bar-disk').style.background = parseFloat(data.disk) > 80 ? '#ef4444' : '#3b82f6';
+                  document.getElementById('txt-disk-detail').innerText = formatBytesJs(data.disk_used * 1048576) + ' / ' + formatBytesJs(data.disk_total * 1048576);
+                  
+                  document.getElementById('txt-proc').innerText = data.processes;
+                  document.getElementById('txt-net-in').innerText = formatBytesJs(data.net_in_speed) + '/s';
+                  document.getElementById('txt-net-out').innerText = formatBytesJs(data.net_out_speed) + '/s';
+                  document.getElementById('txt-tcp').innerText = data.tcp_conn;
+                  document.getElementById('txt-udp').innerText = data.udp_conn;
+
+                  let history = { time: [], cpu: [], ram: [], proc: [], net_in: [], net_out: [], tcp: [], udp: [], ping_ct: [], ping_cu: [], ping_cm: [], ping_bd: [] };
+                  try { if (data.history) history = JSON.parse(data.history); } catch(e) {}
+                  
+                  if (history.time && history.time.length > 0) {
+                     const labels = history.time;
+                     updateChart(charts.cpu, labels, [history.cpu]);
+                     updateChart(charts.ram, labels, [history.ram]);
+                     updateChart(charts.proc, labels, [history.proc]);
+                     updateChart(charts.net, labels, [history.net_in, history.net_out]);
+                     updateChart(charts.conn, labels, [history.tcp, history.udp]);
+                     updateChart(charts.ping, labels, [history.ping_ct, history.ping_cu, history.ping_cm, history.ping_bd]);
+                  }
+               } catch (e) { console.error(e); }
+            }
+
+            function updateChart(chart, labels, datasetsData) {
+               chart.data.labels = labels;
+               datasetsData.forEach((data, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = data; });
+               chart.update();
+            }
+          </script>
+          ${sys.custom_script || ''}
+        </body>
+        </html>`;
+        return new Response(detailHtml, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+      }
+
       if (!isAjax) {
         // 访问量统计
         const nowTime = new Date();
@@ -1259,6 +1518,10 @@ echo "✅ Linux 探针安装成功！热重载功能已启用。"
         // ==========================================
         const runGossip = async () => {
            const nowMs = Date.now();
+           
+           // 清理超过 24 小时未见面的幽灵节点
+           await env.DB.prepare("DELETE FROM peers WHERE last_seen < ? AND last_seen > 0").bind(nowMs - 86400000).run();
+
            let seedList = sys.seed_nodes ? sys.seed_nodes.split(',').map(s => s.trim()).filter(s => s) : [defaultPeersStr];
            
            // 获取本地已知节点去分享
@@ -1591,8 +1854,8 @@ echo "✅ Linux 探针安装成功！热重载功能已启用。"
                <p style="font-size:12px; color:#888; margin-bottom:20px;">* 数据由分布在各地的 Cloudflare Workers 节点通过弱共识自主计算得出。<br>当前全网共记录互联 VPS <b id="modal-global-servers" style="color:#3b82f6;">0</b> 台，汇总资产总额 <b id="modal-global-assets" style="color:#10b981;">0</b>。</p>
                <div class="table-responsive">
                  <table class="custom-table">
-                   <thead><tr><th>排名</th><th>网络节点 (Domain)</th><th>VPS 数量</th><th>探针总资产</th></tr></thead>
-                   <tbody id="rank-tbody"><tr><td colspan="4" style="text-align:center;">加载中...</td></tr></tbody>
+                   <thead><tr><th>排名</th><th>网络节点 (Domain)</th><th>VPS 数量</th><th>探针总资产</th><th>最后活跃</th></tr></thead>
+                   <tbody id="rank-tbody"><tr><td colspan="5" style="text-align:center;">加载中...</td></tr></tbody>
                  </table>
                </div>
                <div style="text-align:right; margin-top:20px;"><button onclick="closeRankModal()" class="btn btn-gray" style="padding: 8px 20px;">关闭</button></div>
@@ -1649,15 +1912,24 @@ echo "✅ Linux 探针安装成功！热重载功能已启用。"
               document.getElementById('rankModal').style.display = 'block';
               const list = window.latestRankList || [];
               let html = '';
+              const nowMs = Date.now();
               if(list.length > 0) {
                   list.forEach((item, index) => {
                       const isMe = item.domain === window.location.hostname;
                       const nameLabel = isMe ? '👑 ' + item.domain + ' (本机)' : item.domain;
                       const tdStyle = isMe ? 'font-weight:bold; color:#10b981;' : '';
-                      html += \`<tr><td style="\${tdStyle}">\${index + 1}</td><td style="\${tdStyle}">\${nameLabel}</td><td style="\${tdStyle}">\${item.servers} 台</td><td style="\${tdStyle}">\${parseFloat(item.assets).toFixed(2)} \${'${sys.asset_currency}'}</td></tr>\`;
+                      
+                      let activeStr = '刚刚';
+                      if (!isMe && item.last_seen) {
+                          const diffMin = Math.floor((nowMs - item.last_seen) / 60000);
+                          if (diffMin > 60) activeStr = Math.floor(diffMin/60) + '小时前';
+                          else if (diffMin > 0) activeStr = diffMin + '分钟前';
+                      }
+                      
+                      html += \`<tr><td style="\${tdStyle}">\${index + 1}</td><td style="\${tdStyle}">\${nameLabel}</td><td style="\${tdStyle}">\${item.servers} 台</td><td style="\${tdStyle}">\${parseFloat(item.assets).toFixed(2)} \${'${sys.asset_currency}'}</td><td style="\${tdStyle}">\${activeStr}</td></tr>\`;
                   });
               } else {
-                  html = '<tr><td colspan="4" style="text-align:center;">本地尚未拉取到其他节点的数据，系统正在后台握手互联中...</td></tr>';
+                  html = '<tr><td colspan="5" style="text-align:center;">本地尚未拉取到其他节点的数据，系统正在后台握手互联中...</td></tr>';
               }
               document.getElementById('rank-tbody').innerHTML = html;
           }

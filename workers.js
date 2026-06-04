@@ -812,7 +812,8 @@ export default {
                         const tip = await env.DB.prepare('SELECT block_hash FROM blockchain_ledger WHERE status = 1 ORDER BY slot_id DESC LIMIT 1').first();
                         if (tip && tip.block_hash === block.block_hash) {
                             const blockData = { slot_id: block.slot_id, proposer_domain: host, block_hash: block.block_hash, parent_hash: block.parent_hash, payload: block.payload, timestamp: block.timestamp, total_difficulty: blockDifficulty, signature: block.signature };
-                            const { results: beacons } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') AND domain != ? ORDER BY last_seen DESC LIMIT 500`).bind(host).all();
+                            // 🚀 优化：限制为随机选取 8 个节点进行 Gossip 传染，完美解决 Workers Fetch 50并发上限问题
+                            const { results: beacons } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') AND domain != ? ORDER BY RANDOM() LIMIT 8`).bind(host).all();
                             for (const b of beacons) {
                                 fetchWithTimeSync(`${b.domain}/api/consensus/submit`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(blockData) }, b.domain).catch(() => {});
                             }
@@ -977,7 +978,8 @@ export default {
 
             const blockData = { slot_id: currentSlot, proposer_domain: host, block_hash: hash, parent_hash: parentHash, payload: payloadStr, timestamp: currentNetTime, total_difficulty: currentDifficulty, signature: signature };
             
-            const { results: beacons } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') AND domain != ? ORDER BY last_seen DESC LIMIT 500`).bind(host).all();
+            // 🚀 优化：自己挖出新块后的广播也限制在 8 个随机节点内，通过 Gossip 层层扩散
+            const { results: beacons } = await env.DB.prepare(`SELECT domain FROM blockchain_peers WHERE is_beacon IN ('true', '1') AND domain != ? ORDER BY RANDOM() LIMIT 8`).bind(host).all();
             for (const b of beacons) {
                 fetchWithTimeSync(`${b.domain}/api/consensus/submit`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(blockData) }, b.domain).catch(() => {});
             }
@@ -2106,7 +2108,8 @@ echo "✅ Linux 高精脱钩版探针安装成功！"
             ctx.waitUntil(checkOfflineNodes());
         }
         
-        if (!globalThis.lastMineAndGossipTime || nowMsForThrottle - globalThis.lastMineAndGossipTime > 5000) {
+        // 🚀 优化：将 mineAndGossip 的触发频率从 5秒 降低至 15秒，配合新的 8 节点广播机制，彻底告别 1047 CPU超载
+        if (!globalThis.lastMineAndGossipTime || nowMsForThrottle - globalThis.lastMineAndGossipTime > 15000) {
             globalThis.lastMineAndGossipTime = nowMsForThrottle;
             ctx.waitUntil((async () => {
                 try {

@@ -114,13 +114,14 @@ curl -sL [https://你的域名.workers.dev/install.sh](https://你的域名.work
     Script 注入：编写原生 JavaScript 接管页面逻辑，比如增加动态粒子背景、甚至通过设置 body { display: none; } 隐藏原生页面，利用 AJAX 请求 /api/server?id=xxx 用你自己的前端框架重绘大盘。
 
 
-### ✨ 自定义二次元透明主题 CSS 演示
+### ✨ 自定义背景图片透明主题 CSS 演示
 
 将以下代码填入后台的 **「自定义 CSS 代码」** 输入框中，即可实现超清动漫壁纸与全站半透明毛玻璃卡片效果：
+https://pic.netbian.com/uploads/allimg/250516/110318-17473645980a8c.jpg  更换成你喜欢的壁纸图片
 ```css
 /* 1. 网页全局背景 */
 body.theme6 {
-  background: url('https://i.33xp.cn/__imgapi.cn__/__imgapi.cn__5d19cf2105e31.jpg') no-repeat center center fixed !important;
+  background: url('https://pic.netbian.com/uploads/allimg/250516/110318-17473645980a8c.jpg') no-repeat center center fixed !important;
   background-size: cover !important;
 }
 
@@ -206,10 +207,10 @@ body.theme6 {
 *   🌸 **樱花飘落**：使用纯数学贝塞尔曲线动态绘制花瓣。
 *   ✨ **星光拖尾**：随鼠标移动生成的炫彩粒子跟随拖尾。
 *   ❤️ **爱心浮动**：鼠标点击页面任意位置，生成随机颜色的爱心并上浮。
-*   ❤️ **背景音乐播放**：实现网易云外链作为背景音乐自动单曲播放。https://music.163.com/song/media/outer/url?id=2616476400.mp3  id=你想替换的网易云音乐的ID即可
+*   ❤️ **背景音乐播放**：实现网易云外链作为背景音乐自动单曲播放。https://music.163.com/song/media/outer/url?id=2614307770.mp3  id=你想替换的网易云音乐的ID即可
 ```html
 <audio id="bgm" autoplay loop preload="auto" style="display:none;">
-    <source src="https://music.163.com/song/media/outer/url?id=2616476400.mp3" type="audio/mpeg">
+    <source src="https://music.163.com/song/media/outer/url?id=2614307770.mp3" type="audio/mpeg">
 </audio>
 
 <script>

@@ -68,49 +68,6 @@
 ---
 
 
-## 🚀 部署指南 (Deployment)
-第一步：配置 Cloudflare 环境
-
-    登录 Cloudflare 控制台，进入 Workers & Pages。
-
-    创建一个全新的 D1 数据库，命名为 probe-db
-
-    创建一个新的 Worker 服务。
-
-第二步：配置 Worker
-
-    将本项目中的 worker.js 代码全部复制并覆盖到你的 Worker 代码编辑器中。
-
-    在 Worker 的 设置 (Settings) -> 变量 (Variables) 中，绑定你刚才创建的 D1 数据库，变量名称必须为 DB。
-
-    在环境变量中添加一个密码变量，用于后台登录：
-
-        变量名：API_SECRET
-
-        值：设置你的高强度密码
-
-第三步：访问与初始化
-
-部署完成后，访问你的 Worker 域名。
-
-    管理后台路径：https://你的域名.workers.dev/admin
-
-    账号：admin
-
-    密码：你设置的 API_SECRET 的值
-    (注意：首次访问会自动初始化 D1 数据表，无需手动建表)
-
-💻 客户端探针安装 (Client Agent)
-
-进入管理后台后，点击 "+ 添加新服务器"。添加完成后，列表中会生成专属的一键安装命令。
-
-直接复制该命令，在你的目标 VPS 上（需 Root 权限）运行即可：
-Bash
-
-curl -sL [https://你的域名.workers.dev/install.sh](https://你的域名.workers.dev/install.sh) | bash -s <SERVER_ID> <API_SECRET>
-
-探针脚本会自动注册为 systemd 服务 (cf-probe.service)，并在后台静默运行，每 5 秒上报一次数据。
-
 🛠️ 高级自定义 (Advanced Injection)
 
 本项目为喜欢折腾的开发者预留了最高权限的魔改入口。进入后台 全局设置 -> 前端主题风格 -> 选择“6. 完全自定义 CSS”：

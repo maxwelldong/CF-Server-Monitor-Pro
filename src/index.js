@@ -2074,7 +2074,8 @@ rm -f /tmp/cf_install.sh
             const netInSpeedRaw = parseFloat(server.net_in_speed) || 0;
             const netOutSpeedRaw = parseFloat(server.net_out_speed) || 0;
             
-            const cCode = (server.country || 'xx').toLowerCase();
+            let cCode = (server.country || 'xx').toLowerCase();
+            if (cCode.toUpperCase() === 'TW') cCode = 'cn';
             const flagHtml = cCode !== 'xx' ? `<img src="https://flagcdn.com/24x18/${cCode}.png" alt="${cCode}" style="vertical-align: sub; margin-right: 5px; border-radius: 2px;">` : '🏳️';
             
             let metaHtml = '';
@@ -2526,7 +2527,7 @@ rm -f /tmp/cf_install.sh
           async function initMap() {
             window.myMap = L.map('map-container', { zoomControl: true, attributionControl: false, minZoom: 1 }).setView([30, 10], 2);
             try {
-                const res = await fetch('https://cdn.jsdelivr.net/gh/johan/world.geo.json@master/countries.geo.json');
+                const res = await fetch('https://cdn.jsdelivr.net/npm/@surbowl/world-geo-json-zh@2.1.5/world.zh.json');
                 worldGeoJson = await res.json();
                 drawMarkers();
             } catch (e) {}
@@ -2547,7 +2548,7 @@ rm -f /tmp/cf_install.sh
 
             geoJsonLayer = L.geoJSON(worldGeoJson, {
                 style: function(feature) {
-                    const isActive = activeIso3[feature.id];
+                    const isActive = activeIso3[feature.properties.iso_a3];
                     return { fillColor: isActive ? '#10b981' : (isDark ? '#2a303c' : '#d5dce2'), weight: 1, opacity: 1, color: isDark ? '#1a202c' : '#ffffff', fillOpacity: 1 };
                 }
             }).addTo(window.myMap);

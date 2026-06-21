@@ -2074,7 +2074,8 @@ rm -f /tmp/cf_install.sh
             const netInSpeedRaw = parseFloat(server.net_in_speed) || 0;
             const netOutSpeedRaw = parseFloat(server.net_out_speed) || 0;
             
-            const cCode = (server.country || 'xx').toLowerCase();
+            let cCode = (server.country || 'xx').toLowerCase();
+            if (cCode.toUpperCase() === 'TW') cCode = 'cn';
             const flagHtml = cCode !== 'xx' ? `<img src="https://flagcdn.com/24x18/${cCode}.png" alt="${cCode}" style="vertical-align: sub; margin-right: 5px; border-radius: 2px;">` : '🏳️';
             
             let metaHtml = '';
